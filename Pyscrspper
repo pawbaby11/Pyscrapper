@@ -1,0 +1,67 @@
+import requests
+from bs4 import BeautifulSoup
+import mysql.connector
+
+# Function to scrape and write Instagram data to .txt files
+def scrape_and_write_to_txt(username, following_output_file, followed_by_output_file):
+    # Define the Instagram profile URL
+    profile_url = f'https://www.instagram.com/{username}/'
+
+    # Send an HTTP GET request to the profile
+    response = requests.get(profile_url)
+
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Extract the usernames from "Following" and "Followed by" lists
+        following = soup.find_all('a', {'class': 'FPmhX notranslate'})
+        followed_by = soup.find_all('a', {'class': 'FPmhX notranslate'})
+
+        with open(following_output_file, 'w') as file:
+            for user in following:
+                file.write(user.get_text() + '\n')
+
+        with open(followed_by_output_file, 'w') as file:
+            for user in followed_by:
+                file.write(user.get_text() + '\n')
+    else:
+        print("Failed to retrieve the Instagram profile. Check the username and try again.")
+
+# Get user inputs
+username = input("Enter the Instagram username to scrape: ")
+following_txt_file = input("Enter the .txt file name to save 'Following' data: ")
+followed_by_txt_file = input("Enter the .txt file name to save 'Followed by' data: ")
+
+# Scrape and write data to .txt files
+scrape_and_write_to_txt(username, following_txt_file, followed_by_txt_file)
+
+# Establish a connection to the MySQL database
+connection = mysql.connector.connect(
+    host="your_host",
+    user="your_user",
+    password="your_password",
+    database="SRCH"
+)
+
+# Create a cursor object
+cursor = connection.cursor()
+
+# Function to insert data into MySQL table with input sanitization
+def insert_into_table(username, table_name):
+    sql = f"INSERT INTO {table_name} (Follower, Followed) VALUES (%s, %s)"
+    with open(username, 'r') as file:
+        for line in file:
+            data = (username, line.strip())
+            cursor.execute(sql, data)
+
+# Insert data into tables with input sanitization
+insert_into_table(username, 'pkm')
+insert_into_table(username, 'nls')
+insert_into_table(username, 'gj')
+
+# Commit the changes
+connection.commit()
+
+# Close the cursor and connection
+cursor.close()
+connection.close()
